@@ -8,7 +8,9 @@
 </head>
 <body class="bg-light">
     <div class="container mt-5">
-        <h2 class="mb-4 text-center text-primary">Fiyat İstihbarat ve Rakip Analiz Sistemi</h2>
+        <h2 class="mb-1 text-center text-primary">Fiyat İstihbarat ve Rakip Analiz Sistemi</h2>
+        
+        <p class="text-center text-muted mb-4" id="sonGuncellemeAlani">Sistem Son Güncelleme: <strong>{{ son_guncelleme_genel }}</strong></p>
 
         <div class="card mb-4 shadow-sm">
             <div class="card-body">
@@ -34,199 +36,297 @@
                         <input type="url" class="form-control" name="link" placeholder="Akakçe Linki" required>
                     </div>
                     <div class="col-md-2">
-                        <button type="submit" class="btn btn-primary w-100" onclick="this.innerHTML='Taranıyor...'">Listeye Ekle</button>
+                        <button type="submit" class="btn btn-primary w-100" onclick="this.innerHTML='Ekleniyor...'">Listeye Ekle</button>
                     </div>
                 </form>
             </div>
         </div>
 
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h4>Takip Edilen Ürünler</h4>
-            <a href="/excel_indir" class="btn btn-success fw-bold">📥 Rapor Al (Excel İndir)</a>
+        <div id="progressCardWrapper">
+            {% if bekleyen > 0 %}
+            <div class="card shadow-sm mb-4 {% if bot_aktif %}border-info{% else %}border-secondary{% endif %}" id="progressCard">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="card-title mb-0 fw-bold {% if bot_aktif %}text-info{% else %}text-secondary{% endif %}">
+                            {% if bot_aktif %}
+                                🤖 Arka Plan Botu Çalışıyor: {{ toplam }} üründen {{ tamamlanan }} tanesi güncellendi. 
+                                <span class="text-danger">(Kalan: {{ bekleyen }} | ⏱️ Tahmini Süre: {{ kalan_sure_metin }})</span>
+                            {% else %}
+                                ⏸️ Güncelleme Durduruldu: Kalan {{ bekleyen }} ürün beklemede.
+                            {% endif %}
+                        </h6>
+                        <div>
+                            {% if bot_aktif %}
+                                <a href="/durdur" class="btn btn-sm btn-danger fw-bold shadow-sm">🛑 Durdur</a>
+                            {% else %}
+                                <a href="/devam_et" class="btn btn-sm btn-success fw-bold shadow-sm">▶️ Devam Et</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="progress" style="height: 25px; border-radius: 10px;">
+                        {% if bot_aktif %}
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-info fw-bold fs-6" 
+                             role="progressbar" style="width: {{ yuzde }}%;" 
+                             aria-valuenow="{{ yuzde }}" aria-valuemin="0" aria-valuemax="100">
+                            %{{ yuzde }}
+                        </div>
+                        {% else %}
+                        <div class="progress-bar bg-secondary fw-bold fs-6" 
+                             role="progressbar" style="width: {{ yuzde }}%; opacity: 0.6;" 
+                             aria-valuenow="{{ yuzde }}" aria-valuemin="0" aria-valuemax="100">
+                            %{{ yuzde }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
 
-        <div class="card shadow-sm">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4>Takip Edilen Ürünler</h4>
+            <div>
+                <a href="/tumunu_guncelle" class="btn btn-outline-primary fw-bold me-2" onclick="return confirm('Mevcut tüm ürünlerin fiyatları silinip baştan taranacaktır. Emin misiniz?');">🔄 Tümünü Güncelle</a>
+                <a href="/excel_indir" class="btn btn-success fw-bold">📥 Rapor Al (Excel İndir)</a>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-5">
             <div class="card-body p-0"> 
                 <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
                     <table class="table table-striped table-hover align-middle mb-0" id="urunTablosu">
                         <thead class="table-dark" style="position: sticky; top: 0; z-index: 10;">
-                        <tr>
-                            <th style="width: 15%;">Barkod</th>
-                            <th style="width: 15%;">Kategori</th>
-                            <th style="width: 35%;">Ürün Adı</th>
-                            <th style="width: 20%;">Akakçe Linki</th>
-                            <th style="width: 15%;">İşlemler</th>
-                        </tr>
-                        <tr class="table-secondary">
-                            <th><input type="text" class="form-control form-control-sm column-filter" data-col="0" placeholder="Barkod Ara..."></th>
-                            <th>
-                                <select class="form-select form-select-sm column-filter" data-col="1">
-                                    <option value="">Tümü</option>
-                                    {% for kat in kategoriler %}
-                                    <option value="{{ kat }}">{{ kat }}</option>
-                                    {% endfor %}
-                                </select>
-                            </th>
-                            <th><input type="text" class="form-control form-control-sm column-filter" data-col="2" placeholder="Ürün Adı Ara..."></th>
-                            <th><input type="text" class="form-control form-control-sm column-filter" data-col="3" placeholder="Link Ara..."></th>
-                            <th></th> </tr>
-                    </thead>
-                    <tbody id="tabloGövdesi">
-                        {% for urun in urunler %}
-                        <tr>
-                            <td><span class="badge bg-secondary fs-6">{{ urun[1] }}</span></td>
-                            <td><span class="badge bg-info text-dark">{{ urun[3] }}</span></td>
-                            <td><strong>{{ urun[2] }}</strong></td>
-                            <td><a href="{{ urun[4] }}" target="_blank" class="text-truncate d-inline-block" style="max-width: 200px;">{{ urun[4] }}</a></td>
-                            <td>
-                                <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editModal{{ urun[0] }}">✏️ Düzenle</button>
-                                <a href="/sil/{{ urun[0] }}" class="btn btn-sm btn-danger" onclick="return confirm('Silmek istediğinize emin misiniz?');">🗑️ Sil</a>
-                            </td>
-                        </tr>
+                            <tr>
+                                <th style="width: 10%;">Barkod</th>
+                                <th style="width: 15%;">Kategori</th>
+                                <th style="width: 25%;">Ürün Adı</th>
+                                <th style="width: 10%;">Fiyat</th>
+                                <th style="width: 15%;">Satıcı</th>
+                                <th style="width: 15%;">Akakçe Linki</th>
+                                <th style="width: 10%;">İşlemler</th>
+                            </tr>
+                            <tr class="table-secondary">
+                                <th><input type="text" class="form-control form-control-sm column-filter" data-col="0" placeholder="Ara..."></th>
+                                <th>
+                                    <select class="form-select form-select-sm column-filter" data-col="1">
+                                        <option value="">Tümü</option>
+                                        {% for kat in kategoriler %}
+                                        <option value="{{ kat }}">{{ kat }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </th>
+                                <th><input type="text" class="form-control form-control-sm column-filter" data-col="2" placeholder="Ara..."></th>
+                                <th><input type="text" class="form-control form-control-sm column-filter" data-col="3" placeholder="Ara..."></th>
+                                <th><input type="text" class="form-control form-control-sm column-filter" data-col="4" placeholder="Ara..."></th>
+                                <th><input type="text" class="form-control form-control-sm column-filter" data-col="5" placeholder="Ara..."></th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabloGövdesi">
+                            {% for urun in urunler %}
+                            <tr>
+                                <td><span class="badge bg-secondary fs-6">{{ urun[1] }}</span></td>
+                                <td><span class="badge bg-info text-dark">{{ urun[3] }}</span></td>
+                                <td><strong>{{ urun[2] }}</strong></td>
+                                
+                                {% if "Bekleniyor" in urun[5] %}
+                                    <td class="text-warning fw-bold">{{ urun[5] }}</td>
+                                {% elif "Çekilemedi" in urun[5] %}
+                                    <td class="text-danger fw-bold">{{ urun[5] }}</td>
+                                {% else %}
+                                    <td class="text-success fw-bold fs-5">{{ urun[5] }} ₺</td>
+                                {% endif %}
+                                
+                                <td>{{ urun[6] }}</td>
+                                <td><a href="{{ urun[4] }}" target="_blank" class="text-truncate d-inline-block" style="max-width: 150px;">{{ urun[4] }}</a></td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-warning mb-1" data-bs-toggle="modal" data-bs-target="#editModal{{ urun[0] }}">✏️</button>
+                                    <a href="/sil/{{ urun[0] }}" class="btn btn-sm btn-danger mb-1" onclick="return confirm('Silmek istediğinize emin misiniz?');">🗑️</a>
+                                </td>
+                            </tr>
 
-                        <div class="modal fade" id="editModal{{ urun[0] }}" tabindex="-1" aria-labelledby="editModalLabel{{ urun[0] }}" aria-hidden="true">
-                          <div class="modal-dialog">
-                            <div class="modal-content">
-                              <div class="modal-header">
-                                <h5 class="modal-title" id="editModalLabel{{ urun[0] }}">✏️ Ürünü Düzenle</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                            <div class="modal fade" id="editModal{{ urun[0] }}" tabindex="-1" aria-labelledby="editModalLabel{{ urun[0] }}" aria-hidden="true">
+                              <div class="modal-dialog">
+                                <div class="modal-content">
+                                  <div class="modal-header">
+                                    <h5 class="modal-title" id="editModalLabel{{ urun[0] }}">✏️ Ürünü Düzenle</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                                  </div>
+                                  <form action="/duzenle/{{ urun[0] }}" method="POST">
+                                      <div class="modal-body">
+                                          <div class="mb-3">
+                                              <label class="form-label fw-bold">Firma Barkodu</label>
+                                              <input type="text" class="form-control" name="barkod" value="{{ urun[1] }}" required>
+                                          </div>
+                                          <div class="mb-3">
+                                              <label class="form-label fw-bold">Kategori</label>
+                                              <select class="form-select" name="kategori" required>
+                                                  {% for kat in kategoriler %}
+                                                  <option value="{{ kat }}" {% if kat == urun[3] %}selected{% endif %}>{{ kat }}</option>
+                                                  {% endfor %}
+                                              </select>
+                                          </div>
+                                          <div class="mb-3">
+                                              <label class="form-label fw-bold">Akakçe Linki</label>
+                                              <input type="url" class="form-control" name="link" value="{{ urun[4] }}" required>
+                                          </div>
+                                      </div>
+                                      <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                                        <button type="submit" class="btn btn-success" onclick="this.innerHTML='Güncelleniyor...'">Kaydet</button>
+                                      </div>
+                                  </form>
+                                </div>
                               </div>
-                              <form action="/duzenle/{{ urun[0] }}" method="POST">
-                                  <div class="modal-body">
-                                      <div class="mb-3">
-                                          <label class="form-label fw-bold">Firma Barkodu</label>
-                                          <input type="text" class="form-control" name="barkod" value="{{ urun[1] }}" required>
-                                      </div>
-                                      <div class="mb-3">
-                                          <label class="form-label fw-bold">Kategori</label>
-                                          <select class="form-select" name="kategori" required>
-                                              {% for kat in kategoriler %}
-                                              <option value="{{ kat }}" {% if kat == urun[3] %}selected{% endif %}>{{ kat }}</option>
-                                              {% endfor %}
-                                          </select>
-                                      </div>
-                                      <div class="mb-3">
-                                          <label class="form-label fw-bold">Akakçe Linki</label>
-                                          <input type="url" class="form-control" name="link" value="{{ urun[4] }}" required>
-                                      </div>
-                                  </div>
-                                  <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
-                                    <button type="submit" class="btn btn-success" onclick="this.innerHTML='Güncelleniyor...'">Kaydet</button>
-                                  </div>
-                              </form>
                             </div>
-                          </div>
-                        </div>
-                        {% else %}
-                        <tr id="bosSatir">
-                            <td colspan="5" class="text-center text-muted py-3">Henüz takip edilen bir ürün yok.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                            {% else %}
+                            <tr id="bosSatir">
+                                <td colspan="7" class="text-center text-muted py-3">Henüz takip edilen bir ürün yok.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const filters = document.querySelectorAll('.column-filter');
-            const tbody = document.getElementById('tabloGövdesi');
-            const rows = tbody.querySelectorAll('tr:not(#bosSatir)');
-
-            filters.forEach(filter => {
-                // Inputlar için 'keyup', Select için 'change' dinliyoruz
-                filter.addEventListener('input', applyFilters);
-                if(filter.tagName === 'SELECT') filter.addEventListener('change', applyFilters);
-            });
-
-            function applyFilters() {
-                // Aktif filtreleri topla
-                let activeFilters = [];
-                filters.forEach(f => {
-                    let val = f.value.trim().toLowerCase();
-                    if (val !== "") {
-                        activeFilters.push({ colIndex: parseInt(f.getAttribute('data-col')), value: val });
-                    }
-                });
-
-                // Her satırı kontrol et
-                rows.forEach(row => {
-                    let match = true;
-                    activeFilters.forEach(f => {
-                        let cellText = row.cells[f.colIndex].innerText.toLowerCase();
-                        if (!cellText.includes(f.value)) {
-                            match = false;
-                        }
-                    });
-                    // Uyuyorsa göster, uymuyorsa gizle
-                    row.style.display = match ? '' : 'none';
-                });
-            }
-        });
-    </script>
     <div class="modal fade" id="bulkUploadModal" tabindex="-1" aria-labelledby="bulkUploadModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-          <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-              <h5 class="modal-title" id="bulkUploadModalLabel">📁 Excel ile Toplu Ürün Yükle</h5>
-              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Kapat"></button>
-            </div>
-            <form action="/toplu_ekle" method="POST" enctype="multipart/form-data">
-                <div class="modal-body">
-                    <p class="text-muted small">
-                        Yükleyeceğiniz Excel dosyasının ilk satırında tam olarak şu başlıklar olmalıdır:<br>
-                        <strong>Barkod</strong> | <strong>Kategori</strong> | <strong>Link</strong><br>
-                        <strong>Kategori isimlerini sistemdeki gibi tanımlayınız!</strong>
-                    </p>
-                    <div class="mb-3">
-                        <input class="form-control" type="file" name="excel_dosya" accept=".xlsx, .xls" required>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
-                  <button type="submit" class="btn btn-success" onclick="this.innerHTML='Yükleniyor ve Taranıyor, Lütfen Bekleyin...'; this.classList.add('disabled');">Yükle ve Tarama Başlat</button>
-                </div>
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header bg-success text-white">
+            <h5 class="modal-title" id="bulkUploadModalLabel">📁 Excel ile Toplu Ürün Yükle</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Kapat"></button>
+          </div>
+          <form action="/toplu_ekle" method="POST" enctype="multipart/form-data">
+              <div class="modal-body">
+                  <p class="text-muted small">
+                      Yükleyeceğiniz Excel dosyasının ilk satırında tam olarak şu başlıklar olmalıdır:<br>
+                      <strong>Barkod</strong> | <strong>Kategori</strong> | <strong>Link</strong>
+                  </p>
+                  <div class="mb-3">
+                      <input class="form-control" type="file" name="excel_dosya" accept=".xlsx, .xls" required>
+                  </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                <button type="submit" class="btn btn-success" onclick="this.innerHTML='Yükleniyor...'; this.classList.add('disabled');">Yükle ve Tarama Başlat</button>
+              </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    {% if duplicate_data %}
+    <div class="modal fade" id="duplicateModal" tabindex="-1" aria-labelledby="duplicateModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+      <div class="modal-dialog">
+        <div class="modal-content border-danger">
+          <div class="modal-header bg-danger text-white">
+            <h5 class="modal-title" id="duplicateModalLabel">⚠️ Uyarı: Bu Link Zaten Sistemde!</h5>
+            <a href="/" class="btn-close btn-close-white" aria-label="Kapat"></a>
+          </div>
+          <div class="modal-body">
+            <p>Eklemeye çalıştığınız Akakçe linki sistemde şu an <strong>{{ duplicate_data.mevcut_ad }}</strong> adıyla takip ediliyor.</p>
+            <p class="text-muted small">Aynı linki farklı bir barkod ({{ duplicate_data.barkod }}) veya kategori ({{ duplicate_data.kategori }}) ile listeye bir kez daha eklemek istediğinize emin misiniz?</p>
+          </div>
+          <div class="modal-footer">
+            <form action="/ekle" method="POST" class="w-100 d-flex justify-content-between m-0">
+                <input type="hidden" name="barkod" value="{{ duplicate_data.barkod }}">
+                <input type="hidden" name="kategori" value="{{ duplicate_data.kategori }}">
+                <input type="hidden" name="link" value="{{ duplicate_data.link }}">
+                <input type="hidden" name="onay" value="1">
+                <a href="/" class="btn btn-secondary w-50 me-2">❌ Vazgeç</a>
+                <button type="submit" class="btn btn-danger w-50" onclick="this.innerHTML='Ekleniyor...'">✅ Yine de Devam Et</button>
             </form>
           </div>
         </div>
       </div>
-      {% if duplicate_data %}
-      <div class="modal fade" id="duplicateModal" tabindex="-1" aria-labelledby="duplicateModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog">
-          <div class="modal-content border-danger">
-            <div class="modal-header bg-danger text-white">
-              <h5 class="modal-title" id="duplicateModalLabel">⚠️ Uyarı: Bu Link Zaten Sistemde!</h5>
-              <a href="/" class="btn-close btn-close-white" aria-label="Kapat"></a>
-            </div>
-            <div class="modal-body">
-              <p>Eklemeye çalıştığınız Akakçe linki sistemde şu an <strong>{{ duplicate_data.mevcut_ad }}</strong> adıyla takip ediliyor.</p>
-              <p class="text-muted small">Aynı linki farklı bir barkod ({{ duplicate_data.barkod }}) veya kategori ({{ duplicate_data.kategori }}) ile listeye bir kez daha eklemek istediğinize emin misiniz?</p>
-            </div>
-            <div class="modal-footer">
-              <form action="/ekle" method="POST" class="w-100 d-flex justify-content-between m-0">
-                  <input type="hidden" name="barkod" value="{{ duplicate_data.barkod }}">
-                  <input type="hidden" name="kategori" value="{{ duplicate_data.kategori }}">
-                  <input type="hidden" name="link" value="{{ duplicate_data.link }}">
-                  <input type="hidden" name="onay" value="1">
-  
-                  <a href="/" class="btn btn-secondary w-50 me-2">❌ Vazgeç</a>
-                  <button type="submit" class="btn btn-danger w-50" onclick="this.innerHTML='Ekleniyor...'">✅ Yine de Devam Et</button>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
-  
-      <script>
-          document.addEventListener("DOMContentLoaded", function() {
-              var duplicateModal = new bootstrap.Modal(document.getElementById('duplicateModal'));
-              duplicateModal.show();
-          });
-      </script>
-      {% endif %}
+    </div>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            var duplicateModal = new bootstrap.Modal(document.getElementById('duplicateModal'));
+            duplicateModal.show();
+        });
+    </script>
+    {% endif %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Tablo Arama Filtresi Fonksiyonu
+        function applyFilters() {
+            const filters = document.querySelectorAll('.column-filter');
+            const tbody = document.getElementById('tabloGövdesi');
+            if(!tbody) return;
+            const rows = tbody.querySelectorAll('tr:not(#bosSatir)');
+            let activeFilters = [];
+            
+            filters.forEach(f => {
+                let val = f.value.trim().toLowerCase();
+                if (val !== "") {
+                    activeFilters.push({ colIndex: parseInt(f.getAttribute('data-col')), value: val });
+                }
+            });
+
+            rows.forEach(row => {
+                let match = true;
+                activeFilters.forEach(f => {
+                    let cellText = row.cells[f.colIndex].innerText.toLowerCase();
+                    if (!cellText.includes(f.value)) {
+                        match = false;
+                    }
+                });
+                row.style.display = match ? '' : 'none';
+            });
+        }
+        
+        // İlk Yüklemede Arama Filtrelerini Aktif Et
+        document.addEventListener('DOMContentLoaded', function() {
+            const filters = document.querySelectorAll('.column-filter');
+            filters.forEach(filter => {
+                filter.addEventListener('input', applyFilters);
+                if(filter.tagName === 'SELECT') {
+                    filter.addEventListener('change', applyFilters);
+                }
+            });
+        });
+
+        // OTOMATİK SAYFA YENİLEME (AJAX - Her 5 Saniyede Bir)
+        setInterval(function() {
+            const wrapper = document.getElementById('progressCardWrapper');
+            const tablo = document.getElementById('tabloGövdesi');
+            
+            // Eğer progress bar ekrandaysa VEYA tabloda hala "Bekleniyor" yazan bir ürün varsa arka planı dinle
+            if ((wrapper && wrapper.innerHTML.trim() !== "") || (tablo && tablo.innerHTML.includes('Bekleniyor'))) {
+                fetch('/')
+                    .then(response => response.text())
+                    .then(html => {
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, 'text/html');
+                        
+                        // 1. Tabloyu Güncelle
+                        const newTbody = doc.getElementById('tabloGövdesi');
+                        if(newTbody) {
+                            document.getElementById('tabloGövdesi').innerHTML = newTbody.innerHTML;
+                            applyFilters(); // Arama varsa bozulmasın diye tekrar çalıştır
+                        }
+                        
+                        // 2. İlerleme Çubuğunu Güncelle
+                        const newProgress = doc.getElementById('progressCardWrapper');
+                        if (newProgress) {
+                            document.getElementById('progressCardWrapper').innerHTML = newProgress.innerHTML;
+                        }
+
+                        // 3. EKSİK OLAN KISIM: Son Güncelleme Tarihini Güncelle
+                        const yeniTarih = doc.getElementById('sonGuncellemeAlani');
+                        if (yeniTarih) {
+                            document.getElementById('sonGuncellemeAlani').innerHTML = yeniTarih.innerHTML;
+                        }
+                    })
+                    .catch(err => console.log('Arka plan güncellemesi bekleniyor...'));
+            }
+        }, 5000);
+    </script>
 </body>
 </html>

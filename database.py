@@ -6,13 +6,15 @@ def baglan():
 def tablo_olustur():
     conn = baglan()
     cursor = conn.cursor()
-    # link sütunundaki UNIQUE kelimesini kaldırdık
     cursor.execute('''CREATE TABLE IF NOT EXISTS urunler 
                       (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                        barkod TEXT, 
                        urun_adi TEXT, 
                        kategori TEXT,
-                       link TEXT)''')
+                       link TEXT,
+                       fiyat TEXT,
+                       satici TEXT,
+                       son_guncelleme TEXT)''')
     conn.commit()
     conn.close()
 
